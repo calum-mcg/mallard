@@ -1,0 +1,7 @@
+defaultProject: "test-project"
+defaultDataset: "test_dataset"
+defaultLocation: "US"
+defaultAssertionDataset: "test_dataset_assertions"
+dataformCoreVersion: "3.0.8"
+vars:
+  date_id: "2023-01-01"

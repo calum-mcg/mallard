@@ -1,0 +1,11 @@
+config {
+  type: "assertion",
+  name: "assert_pass"
+}
+
+SELECT
+  *
+FROM
+  ${ref("dim_events")}
+WHERE
+  event_name = 'spam'

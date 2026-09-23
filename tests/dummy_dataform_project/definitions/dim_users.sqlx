@@ -1,0 +1,11 @@
+config {
+  type: "table",
+  name: "dim_users",
+  tags: ["users"]
+}
+
+SELECT
+  id,
+  user_name
+FROM
+  ${ref("stg_users")}

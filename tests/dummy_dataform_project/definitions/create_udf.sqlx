@@ -1,0 +1,9 @@
+config {
+  type: "operations",
+  hasOutput: true,
+  name: "create_udf"
+}
+
+CREATE OR REPLACE FUNCTION ${self()} (name STRING) RETURNS STRING AS (
+  CONCAT('user_', name)
+);

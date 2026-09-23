@@ -1,0 +1,11 @@
+config {
+  type: "incremental",
+  name: "fct_events",
+  tags: ["events"]
+}
+
+SELECT
+  id,
+  event_name
+FROM
+  ${ref("dim_events")}

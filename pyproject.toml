@@ -1,0 +1,35 @@
+[project]
+name = "mallard"
+version = "0.1.0"
+description = "A fast local execution engine for Dataform projects"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "duckdb>=1.5.5",
+    "google-cloud-bigquery>=3.44.0",
+    "google-cloud-bigquery-storage>=2.27.0",
+    "networkx>=3.4.2",
+    "pyarrow>=25.0.1",
+    "pyyaml>=6.0.3",
+    "questionary>=2.1.1",
+    "rich>=15.0.0",
+    "sqlglot>=30.17.0",
+    "typer>=0.27.2",
+]
+
+[project.scripts]
+mallard = "mallard.cli:app"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-mock>=3.15.1",
+    "ruff>=0.16.5",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff.lint]
+ignore = ["BLE001"]

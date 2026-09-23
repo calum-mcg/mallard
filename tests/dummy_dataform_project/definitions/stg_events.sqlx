@@ -1,0 +1,12 @@
+config {
+  type: "view",
+  name: "stg_events"
+}
+
+SELECT
+  id,
+  event_name
+FROM
+  ${ref("raw_events")}
+WHERE
+  event_name != 'spam'

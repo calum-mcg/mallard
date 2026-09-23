@@ -1,0 +1,10 @@
+config {
+  type: "table",
+  name: "dim_events"
+}
+
+SELECT
+  id,
+  event_name
+FROM
+  ${ref("stg_events")}

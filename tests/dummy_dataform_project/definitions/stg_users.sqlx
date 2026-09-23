@@ -1,0 +1,11 @@
+config {
+  type: "view",
+  name: "stg_users",
+  tags: ["users"]
+}
+
+SELECT
+  id,
+  event_name AS user_name
+FROM
+  ${ref("raw_users")}
