@@ -6,17 +6,20 @@ from rich.console import Console
 
 console = Console()
 
+
 def run_init_wizard():
     """
     Interactive CLI setup wizard to create .mallard.yml.
     """
-    console.print("\n[bold cyan]🦆 Welcome to Mallard Initialization Wizard[/bold cyan]\n")
+    console.print(
+        "\n[bold cyan]🦆 Welcome to Mallard Initialization Wizard[/bold cyan]\n"
+    )
 
     # Pre-parse workflow_settings.yaml to suggest defaults
     default_project = ""
     default_dataset = ""
     has_vars = False
-    
+
     wf_settings_path = Path("workflow_settings.yaml")
     if wf_settings_path.exists():
         try:
@@ -27,9 +30,13 @@ def run_init_wizard():
                     default_dataset = wf_settings.get("defaultDataset", "")
                     has_vars = "vars" in wf_settings
         except Exception as e:
-            console.print(f"[yellow]Warning: Could not parse workflow_settings.yaml to suggest defaults: {e}[/yellow]")
+            console.print(
+                f"[yellow]Warning: Could not parse workflow_settings.yaml to suggest defaults: {e}[/yellow]"
+            )
 
-    project_id = questionary.text("What is your BigQuery Project ID?", default=default_project).ask()
+    project_id = questionary.text(
+        "What is your BigQuery Project ID?", default=default_project
+    ).ask()
     if project_id is None:
         console.print("[bold red]Operation cancelled by user. Aborting.[/bold red]")
         return
@@ -37,16 +44,20 @@ def run_init_wizard():
         console.print("[bold red]Project ID is required. Aborting.[/bold red]")
         return
 
-    dataset = questionary.text("What is the default dataset?", default=default_dataset).ask()
+    dataset = questionary.text(
+        "What is the default dataset?", default=default_dataset
+    ).ask()
     if dataset is None:
         console.print("[bold red]Operation cancelled by user. Aborting.[/bold red]")
         return
 
-    row_limit = questionary.text("What is the default row limit for local execution? (e.g. 1000)", default="1000").ask()
+    row_limit = questionary.text(
+        "What is the default row limit for local execution? (e.g. 1000)", default="1000"
+    ).ask()
     if row_limit is None:
         console.print("[bold red]Operation cancelled by user. Aborting.[/bold red]")
         return
-    
+
     try:
         row_limit = int(row_limit)
     except ValueError:
@@ -58,12 +69,14 @@ def run_init_wizard():
         "dataset": dataset,
         "row_limit": row_limit,
     }
-    
+
     if has_vars:
         config["partition_filters"] = {
             "example_source_name": "date_column = '{var_name}'"
         }
-        console.print("[blue]Detected vars in workflow_settings.yaml. Added example partition_filters to .mallard.yml.[/blue]")
+        console.print(
+            "[blue]Detected vars in workflow_settings.yaml. Added example partition_filters to .mallard.yml.[/blue]"
+        )
 
     config_path = Path(".mallard.yml")
     with open(config_path, "w") as f:

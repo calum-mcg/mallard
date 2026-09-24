@@ -10,6 +10,7 @@ def _target_to_id(target: dict) -> str:
     name = target.get("name", "")
     return f"{database}.{schema}.{name}" if database else f"{schema}.{name}"
 
+
 def build_dag(compiled_graph: dict) -> nx.DiGraph:
     """
     Map parsed Dataform models into a NetworkX DAG.
@@ -44,10 +45,10 @@ def build_dag(compiled_graph: dict) -> nx.DiGraph:
         target = action.get("target")
         if not target:
             continue
-        
+
         node_id = _target_to_id(target)
         deps = action.get("dependencyTargets", [])
-        
+
         for dep in deps:
             dep_id = _target_to_id(dep)
             if dep_id in dag:
@@ -55,9 +56,10 @@ def build_dag(compiled_graph: dict) -> nx.DiGraph:
 
     return dag
 
+
 def resolve_selection(
-    dag: nx.DiGraph, 
-    select: str | None = None, 
+    dag: nx.DiGraph,
+    select: str | None = None,
     tags: str | None = None,
     upstream: bool = False,
     downstream: bool = False,
@@ -71,7 +73,9 @@ def resolve_selection(
 
     if not select and not tags:
         # Default: return all nodes that are not declarations
-        return [n for n, attr in dag.nodes(data=True) if attr.get("type") != "declaration"]
+        return [
+            n for n, attr in dag.nodes(data=True) if attr.get("type") != "declaration"
+        ]
 
     if tags:
         tag_list = [t.strip() for t in tags.split(",")]
@@ -90,26 +94,34 @@ def resolve_selection(
             # Find matching nodes
             matches = []
             for n, attr in dag.nodes(data=True):
-                if n == base_name or attr.get("short_name") == base_name or n.endswith(f".{base_name}"):
+                if (
+                    n == base_name
+                    or attr.get("short_name") == base_name
+                    or n.endswith(f".{base_name}")
+                ):
                     matches.append(n)
-            
+
             # De-duplicate exactly identical matches (e.g. matched both n and short_name)
             matches = list(set(matches))
-            
+
             if len(matches) > 1:
                 # Ambiguous selection!
                 import sys
 
                 from rich.console import Console
-                
+
                 c = Console()
-                c.print(f"\n[bold red]Ambiguous selection for '{base_name}':[/bold red]")
-                c.print("[yellow]Multiple models match this name. Please be more specific by including the schema or database.[/yellow]")
+                c.print(
+                    f"\n[bold red]Ambiguous selection for '{base_name}':[/bold red]"
+                )
+                c.print(
+                    "[yellow]Multiple models match this name. Please be more specific by including the schema or database.[/yellow]"
+                )
                 for m in matches:
                     c.print(f"  - {m}")
                 c.print()
                 sys.exit(1)
-            
+
             for match in matches:
                 initial_matches.add(match)
                 if include_upstream:
@@ -121,11 +133,11 @@ def resolve_selection(
 
     # Apply global --upstream / --downstream to tag matches (or explicitly injected items)
     selected_nodes.update(initial_matches)
-    
+
     if upstream:
         for match in list(initial_matches):
             selected_nodes.update(nx.ancestors(dag, match))
-            
+
     if downstream:
         for match in list(initial_matches):
             selected_nodes.update(nx.descendants(dag, match))
