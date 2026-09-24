@@ -11,7 +11,7 @@
 
 ---
 
-Mallard eliminates BigQuery slot costs during local development by compiling Dataform DAGs, transpiling BigQuery SQL dialect to DuckDB, and maintaining a local `.mallard/` database cache.
+Mallard eliminates BigQuery slot costs during local development by parsing compiled Dataform DAGs, transpiling BigQuery SQL dialect to DuckDB, and maintaining a local `.mallard/` database cache.
 
 ### Documentation
 

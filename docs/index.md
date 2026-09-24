@@ -1,12 +1,12 @@
 # Mallard
 
-Mallard eliminates BigQuery slot costs during local development by compiling Dataform DAGs, transpiling BigQuery SQL dialect to DuckDB, and maintaining a local `.mallard/` database cache.
+Mallard eliminates BigQuery slot costs during local development by parsing compiled Dataform DAGs, transpiling BigQuery SQL dialect to DuckDB, and maintaining a local `.mallard/` database cache.
 
 ## How it works
 
 When you run a command like `mallard run --select my_model`, Mallard performs the following steps:
 
-1. **Compiles Dataform**: It uses the underlying `@dataform/cli` to parse your `workflow_settings.yaml` and `.sqlx` definitions into a JSON compiled graph.
+1. **Compiles Dataform**: It uses the underlying `@dataform/cli` to parse your `workflow_settings.yaml` and `.sqlx` definitions into a JSON compiled graph (using `dataform compile --json`).
 2. **Builds the DAG**: Resolves model dependencies and evaluates selection criteria (e.g. tags, specific models, upstream/downstream flags).
 3. **Hydrates Sources**: Detects which base source `declarations` are required for the selected subset of models. It then executes limited `SELECT * FROM source LIMIT N` queries directly against BigQuery, downloads the result using PyArrow, and caches it locally in DuckDB.
 4. **Transpiles SQL**: Automatically translates BigQuery specific SQL dialects (like `FARM_FINGERPRINT()`, `UNNEST(array) WITH OFFSET`, `EXTRACT(DATE FROM ts)`, string aggregation, and structural types) into their DuckDB equivalents using `sqlglot`.
