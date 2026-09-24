@@ -13,11 +13,11 @@
 
 Mallard eliminates BigQuery slot costs during local development by compiling Dataform DAGs, transpiling BigQuery SQL dialect to DuckDB, and maintaining a local `.mallard/` database cache.
 
-### 📚 Documentation
+### Documentation
 
 **Read the full documentation at [https://calum-mcg.github.io/mallard/](https://calum-mcg.github.io/mallard/)**
 
-### 🚀 Quick Start Guide
+### Quick Start Guide
 
 Install Mallard globally using `uv`:
 
@@ -46,7 +46,7 @@ mallard init
 mallard run --select +my_model+
 ```
 
-### 🧪 Local Development & Testing
+### Local Development & Testing
 
 If you are developing Mallard and want to run tests locally:
 
