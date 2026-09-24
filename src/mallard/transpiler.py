@@ -1,11 +1,13 @@
-import sqlglot
 import logging
 
+import sqlglot
+
 logging.getLogger("sqlglot").setLevel(logging.ERROR)
-import sqlglot.expressions as exp
 import json
-import traceback
 import time
+import traceback
+
+import sqlglot.expressions as exp
 
 
 def __log_debug(hypothesis_id, message, data):

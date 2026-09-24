@@ -72,7 +72,7 @@ def hydrate_sources(dag, selected_nodes, compiled_graph=None):
             console.print(f"✅ [dim]{source_id} (cached)[/dim]")
             continue
 
-        pass  # console.print(f"⏳ Hydrating {source_id} (limit: {row_limit})")
+        # console.print(f"⏳ Hydrating {source_id} (limit: {row_limit})")
 
         bq_table_ref = f"{database}.{schema}.{name}" if database else f"{schema}.{name}"
         query = f"SELECT * FROM `{bq_table_ref}`"
@@ -84,24 +84,24 @@ def hydrate_sources(dag, selected_nodes, compiled_graph=None):
                 # Format the filter string with the variables
                 formatted_filter = filter_str.format(**df_vars)
                 query += f" WHERE {formatted_filter}"
-                pass  # hide
-            except KeyError as e:
+                # hide
+            except KeyError:
                 pass  # hide
         elif table_name in partition_filters:
             filter_str = partition_filters[table_name]
             try:
                 formatted_filter = filter_str.format(**df_vars)
                 query += f" WHERE {formatted_filter}"
-                pass  # hide
-            except KeyError as e:
+                # hide
+            except KeyError:
                 pass  # hide
         elif source_id in partition_filters:
             filter_str = partition_filters[source_id]
             try:
                 formatted_filter = filter_str.format(**df_vars)
                 query += f" WHERE {formatted_filter}"
-                pass  # hide
-            except KeyError as e:
+                # hide
+            except KeyError:
                 pass  # hide
 
         query += f" LIMIT {row_limit}"

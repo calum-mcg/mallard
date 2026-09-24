@@ -82,7 +82,6 @@ def execute_dag(dag: nx.DiGraph, selected_nodes: list[str], full_refresh: bool =
         table_name = f"{schema}_{name}"
 
         if action_type == "table" or action_type == "view":
-            pass
 
             # Need to transform BigQuery ref syntax like `database.schema.table` to `schema_table`
             # For simplicity in this demo we rely on transpiler or user to use plain SQL
@@ -124,14 +123,12 @@ def execute_dag(dag: nx.DiGraph, selected_nodes: list[str], full_refresh: bool =
                 print("====================================================")
 
         elif action_type == "incremental":
-            pass
 
             try:
                 is_full_refresh = full_refresh or not table_exists(con, table_name)
 
                 if is_full_refresh:
                     # BEHAVIOR 1: Full rebuild
-                    pass
                     duckdb_sql = transpile_to_duckdb(query)
                     try:
                         con.execute(f"DROP VIEW IF EXISTS {table_name}")
@@ -195,7 +192,6 @@ def execute_dag(dag: nx.DiGraph, selected_nodes: list[str], full_refresh: bool =
                 print("====================================================")
 
         elif action_type == "assertion":
-            pass
             duckdb_sql = transpile_to_duckdb(query)
             try:
                 result = con.execute(duckdb_sql).fetchall()
@@ -226,7 +222,6 @@ def execute_dag(dag: nx.DiGraph, selected_nodes: list[str], full_refresh: bool =
                 sys.exit(1)
 
         elif action_type == "operation":
-            pass
             queries = node_data.get("queries", [])
             for q in queries:
                 duckdb_sql = transpile_to_duckdb(q)

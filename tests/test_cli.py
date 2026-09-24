@@ -1,4 +1,5 @@
 from typer.testing import CliRunner
+
 from mallard.cli import app
 
 runner = CliRunner()

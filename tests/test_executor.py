@@ -1,5 +1,6 @@
 import duckdb
 import networkx as nx
+
 from mallard.executor import execute_dag, table_exists
 
 
@@ -70,7 +71,6 @@ def test_execute_dag_incremental_full_refresh(tmp_path, mocker):
 
 
 def test_execute_dag_assertion_failure(tmp_path, mocker):
-    import sys
     import pytest
 
     mocker.patch("mallard.executor.os.makedirs")
