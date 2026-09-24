@@ -6,7 +6,7 @@
   [![Python](https://img.shields.io/badge/Python-3.14%2B-blue.svg)](https://python.org)
   [![DuckDB](https://img.shields.io/badge/DuckDB-1.1%2B-yellow.svg)](https://duckdb.org/)
   [![Dataform](https://img.shields.io/badge/Dataform-CLI-green.svg)](https://cloud.google.com/dataform)
-  [![License](https://img.shields.io/badge/License-MIT-blue.svg)](#)
+  [![License](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 </div>
 
 ---
