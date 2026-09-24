@@ -118,7 +118,7 @@ def execute_dag(dag: nx.DiGraph, selected_nodes: list[str], full_refresh: bool =
                 print("==================== FAILED SQL ====================")
                 try:
                     print(duckdb_sql)
-                except:
+                except Exception:
                     pass
                 print("====================================================")
 
@@ -187,7 +187,7 @@ def execute_dag(dag: nx.DiGraph, selected_nodes: list[str], full_refresh: bool =
                 print("==================== FAILED SQL ====================")
                 try:
                     print(duckdb_sql)
-                except:
+                except Exception:
                     pass
                 print("====================================================")
 

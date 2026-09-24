@@ -36,10 +36,10 @@ def __log_debug(hypothesis_id, message, data):
 
 
 def _transform_ast(node):
-    if isinstance(node, exp.Table):
-        if "INFORMATION_SCHEMA" in node.name.upper() or (
-            node.db and "INFORMATION_SCHEMA" in node.db.upper()
-        ):
+    if isinstance(node, exp.Table) and (
+        "INFORMATION_SCHEMA" in node.name.upper() or 
+        (node.db and "INFORMATION_SCHEMA" in node.db.upper())
+    ):
             # When testing locally with DuckDB, replace any dynamic partition bound queries with a dummy date.
             # E.g. date_id > (SELECT MIN(...) FROM INFORMATION_SCHEMA.PARTITIONS) becomes date_id > '1970-01-01'
             curr = node
@@ -56,8 +56,7 @@ def _transform_ast(node):
 
     try:
         # Convert EXTRACT(DATE FROM x) to CAST(x AS DATE) since DuckDB doesn't support DATE as an extract specifier
-        if isinstance(node, exp.Extract):
-            if node.this.name.upper() == "DATE":
+        if isinstance(node, exp.Extract) and node.this.name.upper() == "DATE":
                 return exp.Cast(
                     this=node.expression.transform(_transform_ast, copy=False),
                     to=exp.DataType.build("DATE"),
@@ -85,13 +84,13 @@ def _transform_ast(node):
             )
 
         # BigQuery SELECT AS STRUCT h.* -> DuckDB SELECT h
-        if isinstance(node, exp.Select):
-            if node.args.get("kind") == "STRUCT":
-                if (
-                    len(node.expressions) == 1
-                    and isinstance(node.expressions[0], exp.Column)
-                    and isinstance(node.expressions[0].this, exp.Star)
-                ):
+        if (
+            isinstance(node, exp.Select) 
+            and node.args.get("kind") == "STRUCT" 
+            and len(node.expressions) == 1 
+            and isinstance(node.expressions[0], exp.Column) 
+            and isinstance(node.expressions[0].this, exp.Star)
+        ):
                     table_name = node.expressions[0].args.get("table")
                     if table_name:
                         node.set("expressions", [exp.Column(this=table_name)])
@@ -214,8 +213,7 @@ def _transform_ast(node):
                         ],
                     )
 
-                if node.name.upper() == "DATE_DIFF":
-                    if len(node.expressions) == 3:
+                if node.name.upper() == "DATE_DIFF" and len(node.expressions) == 3:
                         date_part = node.expressions[0]
                         if isinstance(date_part, exp.Literal):
                             date_part_str = date_part.name.strip("'").strip('"')
@@ -248,8 +246,7 @@ def _transform_ast(node):
                     ],
                 )
 
-        if isinstance(node, exp.In):
-            if node.args.get("unnest"):
+        if isinstance(node, exp.In) and node.args.get("unnest"):
                 unnest_node = node.args["unnest"]
                 if isinstance(unnest_node, exp.Unnest):
                     expr = (

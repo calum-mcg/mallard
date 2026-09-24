@@ -139,7 +139,7 @@ def hydrate_sources(dag, selected_nodes, compiled_graph=None):
                             if "already exists" in str(ex):
                                 console.print(f"✅ [dim]{source_id} (UDF cached)[/dim]")
                             else:
-                                raise ex
+                                raise
                     else:
                         console.print(
                             f"[bold red]Failed to hydrate {source_id}: Not found as Table or UDF.[/bold red]"
