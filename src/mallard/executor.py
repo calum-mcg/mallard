@@ -69,10 +69,7 @@ def execute_dag(dag: nx.DiGraph, selected_nodes: list[str], full_refresh: bool =
         )
         return
 
-
     con = duckdb.connect(db_path)
-    
-
 
     # Optimize DuckDB for memory constrained workloads
     con.execute("PRAGMA max_temp_directory_size='50GiB'")
@@ -80,13 +77,60 @@ def execute_dag(dag: nx.DiGraph, selected_nodes: list[str], full_refresh: bool =
     con.execute("SET threads=1")
     con.execute("PRAGMA memory_limit='12GB'")
 
+    pending_assertions = []
 
+    def flush_assertions():
+        if not pending_assertions:
+            return
 
+        passed = 0
+        total = len(pending_assertions)
+
+        with console.status(
+            f"[dim]Running {total} assertions...[/dim]", spinner="dots"
+        ):
+            for a_node_id, a_query in pending_assertions:
+                duckdb_sql = transpile_to_duckdb(a_query)
+                try:
+                    result = con.execute(duckdb_sql).fetchall()
+                    if result and len(result) > 0:
+                        # Assertion failed
+                        error_msg = (
+                            f"[bold red]Assertion {a_node_id} failed![/bold red]\n"
+                        )
+                        error_msg += f"Returned {len(result)} failing rows.\n"
+                        error_msg += f"Query:\n{duckdb_sql}"
+
+                        console.print(
+                            Panel(
+                                error_msg,
+                                title="[bold red]ERROR[/bold red]",
+                                border_style="red",
+                            )
+                        )
+                        con.close()
+                        sys.exit(1)
+                    else:
+                        passed += 1
+                except SystemExit:
+                    raise
+                except Exception as e:
+                    console.print(
+                        f"[bold red]Error executing assertion {a_node_id}: {e!s}[/bold red]"
+                    )
+                    con.close()
+                    sys.exit(1)
+
+        console.print(f"🛡️  [green]{passed}/{total} assertions passed[/green]")
+        pending_assertions.clear()
 
     for node_id in ordered_nodes:
         node_data = dag.nodes[node_id]
         action_type = node_data.get("type")
         query = node_data.get("query")
+
+        if action_type != "assertion":
+            flush_assertions()
 
         target = node_data.get("target", {})
         schema = target.get("schema")
@@ -94,7 +138,6 @@ def execute_dag(dag: nx.DiGraph, selected_nodes: list[str], full_refresh: bool =
         table_name = f"{schema}_{name}"
 
         if action_type == "table" or action_type == "view":
-
             # Need to transform BigQuery ref syntax like `database.schema.table` to `schema_table`
             # For simplicity in this demo we rely on transpiler or user to use plain SQL
             # In a full Dataform compiler the ${ref()} is already expanded to database.schema.table
@@ -103,49 +146,8 @@ def execute_dag(dag: nx.DiGraph, selected_nodes: list[str], full_refresh: bool =
             # Use transpiler
             duckdb_sql = transpile_to_duckdb(query)
 
-            try:
+            with console.status(f"[dim]Executing {node_id}...[/dim]", spinner="dots"):
                 try:
-                    con.execute(f"DROP VIEW IF EXISTS {table_name}")
-                except duckdb.CatalogException:
-                    pass
-                try:
-                    con.execute(f"DROP TABLE IF EXISTS {table_name}")
-                except duckdb.CatalogException:
-                    pass
-
-                if action_type == "view":
-                    con.execute(f"CREATE VIEW {table_name} AS {duckdb_sql}")
-                else:
-                    con.execute(f"CREATE TABLE {table_name} AS {duckdb_sql}")
-
-                # Fetch row count
-                row_count = con.execute(
-                    f"SELECT count(*) FROM {table_name}"
-                ).fetchone()[0]
-                console.print(
-                    f"✅ [green]{node_id}[/green] [dim]({row_count} rows)[/dim]"
-                )
-            except Exception as e:
-                console.print(f"[bold red]Error executing {node_id}: {e!s}[/bold red]")
-                print("==================== FAILED SQL ====================")
-                try:
-                    print(duckdb_sql)
-                except Exception:
-                    pass
-                print("====================================================")
-
-        elif action_type == "incremental":
-
-            try:
-                is_full_refresh = full_refresh or not table_exists(con, table_name)
-
-                if is_full_refresh:
-                    # BEHAVIOR 1: Full rebuild
-
-                    duckdb_sql = transpile_to_duckdb(query)
-                    with open(f".mallard/{table_name}.sql", "w") as f:
-                        f.write(duckdb_sql)
-
                     try:
                         con.execute(f"DROP VIEW IF EXISTS {table_name}")
                     except duckdb.CatalogException:
@@ -154,99 +156,121 @@ def execute_dag(dag: nx.DiGraph, selected_nodes: list[str], full_refresh: bool =
                         con.execute(f"DROP TABLE IF EXISTS {table_name}")
                     except duckdb.CatalogException:
                         pass
-                    con.execute(f"CREATE TABLE {table_name} AS {duckdb_sql}")
-                else:
-                    # BEHAVIOR 2: Incremental Run
 
-                    # 1. Run Pre-Operations
-                    for pre_op in node_data.get("incrementalPreOps", []):
-                        cleaned_op = clean_dataform_scripts(pre_op)
-                        if cleaned_op:
-                            con.execute(transpile_to_duckdb(cleaned_op))
+                    if action_type == "view":
+                        con.execute(f"CREATE VIEW {table_name} AS {duckdb_sql}")
+                    else:
+                        con.execute(f"CREATE TABLE {table_name} AS {duckdb_sql}")
 
-                    # 2. Extract the incremental query (fallback to base query if none exists)
-                    inc_query = node_data.get("incrementalQuery") or query
-                    duckdb_inc_sql = transpile_to_duckdb(inc_query)
+                    # Fetch row count
+                    row_count = con.execute(
+                        f"SELECT count(*) FROM {table_name}"
+                    ).fetchone()[0]
+                    console.print(
+                        f"✅ [green]{node_id}[/green] [dim]({row_count} rows)[/dim]"
+                    )
+                except Exception as e:
+                    console.print(
+                        f"[bold red]Error executing {node_id}: {e!s}[/bold red]"
+                    )
+                    print("==================== FAILED SQL ====================")
+                    try:
+                        print(duckdb_sql)
+                    except Exception:
+                        pass
+                    print("====================================================")
 
-                    # 3. Apply unique key logic (Merge/Upsert vs standard Append)
-                    unique_key = node_data.get("uniqueKey")
-                    if unique_key:
-                        # DuckDB doesn't have primary keys defined on CTAS tables,
-                        # so we use a standard Delete-then-Insert transaction.
-                        keys_str = ", ".join(unique_key)
-                        delete_sql = f"""
-                            DELETE FROM {table_name}
-                            WHERE ({keys_str}) IN (
-                                SELECT {keys_str} FROM ({duckdb_inc_sql})
-                            )
-                        """
-                        con.execute(delete_sql)
-
-                    # 4. Insert new records
-                    con.execute(f"INSERT INTO {table_name} {duckdb_inc_sql}")
-
-                    # 5. Run Post-Operations
-                    for post_op in node_data.get("incrementalPostOps", []):
-                        cleaned_op = clean_dataform_scripts(post_op)
-                        if cleaned_op:
-                            con.execute(transpile_to_duckdb(cleaned_op))
-
-                # Fetch row count
-                row_count = con.execute(
-                    f"SELECT count(*) FROM {table_name}"
-                ).fetchone()[0]
-                console.print(
-                    f"✅ [green]{node_id}[/green] [dim]({row_count} rows)[/dim]"
-                )
-            except Exception as e:
-                console.print(f"[bold red]Error executing {node_id}: {e!s}[/bold red]")
-                print("==================== FAILED SQL ====================")
+        elif action_type == "incremental":
+            with console.status(f"[dim]Executing {node_id}...[/dim]", spinner="dots"):
                 try:
-                    print(duckdb_sql)
-                except Exception:
-                    pass
-                print("====================================================")
+                    is_full_refresh = full_refresh or not table_exists(con, table_name)
+
+                    if is_full_refresh:
+                        # BEHAVIOR 1: Full rebuild
+
+                        duckdb_sql = transpile_to_duckdb(query)
+                        with open(f".mallard/{table_name}.sql", "w") as f:
+                            f.write(duckdb_sql)
+
+                        try:
+                            con.execute(f"DROP VIEW IF EXISTS {table_name}")
+                        except duckdb.CatalogException:
+                            pass
+                        try:
+                            con.execute(f"DROP TABLE IF EXISTS {table_name}")
+                        except duckdb.CatalogException:
+                            pass
+                        con.execute(f"CREATE TABLE {table_name} AS {duckdb_sql}")
+                    else:
+                        # BEHAVIOR 2: Incremental Run
+
+                        # 1. Run Pre-Operations
+                        for pre_op in node_data.get("incrementalPreOps", []):
+                            cleaned_op = clean_dataform_scripts(pre_op)
+                            if cleaned_op:
+                                con.execute(transpile_to_duckdb(cleaned_op))
+
+                        # 2. Extract the incremental query (fallback to base query if none exists)
+                        inc_query = node_data.get("incrementalQuery") or query
+                        duckdb_inc_sql = transpile_to_duckdb(inc_query)
+
+                        # 3. Apply unique key logic (Merge/Upsert vs standard Append)
+                        unique_key = node_data.get("uniqueKey")
+                        if unique_key:
+                            # DuckDB doesn't have primary keys defined on CTAS tables,
+                            # so we use a standard Delete-then-Insert transaction.
+                            keys_str = ", ".join(unique_key)
+                            delete_sql = f"""
+                                DELETE FROM {table_name}
+                                WHERE ({keys_str}) IN (
+                                    SELECT {keys_str} FROM ({duckdb_inc_sql})
+                                )
+                            """
+                            con.execute(delete_sql)
+
+                        # 4. Insert new records
+                        con.execute(f"INSERT INTO {table_name} {duckdb_inc_sql}")
+
+                        # 5. Run Post-Operations
+                        for post_op in node_data.get("incrementalPostOps", []):
+                            cleaned_op = clean_dataform_scripts(post_op)
+                            if cleaned_op:
+                                con.execute(transpile_to_duckdb(cleaned_op))
+
+                    # Fetch row count
+                    row_count = con.execute(
+                        f"SELECT count(*) FROM {table_name}"
+                    ).fetchone()[0]
+                    console.print(
+                        f"✅ [green]{node_id}[/green] [dim]({row_count} rows)[/dim]"
+                    )
+                except Exception as e:
+                    console.print(
+                        f"[bold red]Error executing {node_id}: {e!s}[/bold red]"
+                    )
+                    print("==================== FAILED SQL ====================")
+                    try:
+                        print(duckdb_sql)
+                    except Exception:
+                        pass
+                    print("====================================================")
 
         elif action_type == "assertion":
-            duckdb_sql = transpile_to_duckdb(query)
-            try:
-                result = con.execute(duckdb_sql).fetchall()
-                if result and len(result) > 0:
-                    # Assertion failed (returns rows)
-                    error_msg = f"[bold red]Assertion {node_id} failed![/bold red]\n"
-                    error_msg += f"Returned {len(result)} failing rows.\n"
-                    error_msg += f"Query:\n{duckdb_sql}"
-
-                    console.print(
-                        Panel(
-                            error_msg,
-                            title="[bold red]ERROR[/bold red]",
-                            border_style="red",
-                        )
-                    )
-                    con.close()
-                    sys.exit(1)
-                else:
-                    console.print(f"✅ [green]{node_id}[/green]")
-            except SystemExit:
-                raise
-            except Exception as e:
-                console.print(
-                    f"[bold red]Error executing assertion {node_id}: {e!s}[/bold red]"
-                )
-                con.close()
-                sys.exit(1)
+            pending_assertions.append((node_id, query))
+            continue
 
         elif action_type == "operation":
             queries = node_data.get("queries", [])
-            for q in queries:
-                duckdb_sql = transpile_to_duckdb(q)
-                try:
-                    con.execute(duckdb_sql)
-                except Exception as e:
-                    console.print(
-                        f"[bold red]Error executing operation {node_id}: {e!s}[/bold red]"
-                    )
-            console.print(f"✅ [green]{node_id}[/green]")
+            with console.status(f"[dim]Executing {node_id}...[/dim]", spinner="dots"):
+                for q in queries:
+                    duckdb_sql = transpile_to_duckdb(q)
+                    try:
+                        con.execute(duckdb_sql)
+                    except Exception as e:
+                        console.print(
+                            f"[bold red]Error executing operation {node_id}: {e!s}[/bold red]"
+                        )
+                console.print(f"✅ [green]{node_id}[/green]")
 
+    flush_assertions()
     con.close()
