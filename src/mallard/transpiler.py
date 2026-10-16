@@ -36,6 +36,9 @@ def __log_debug(hypothesis_id, message, data):
 
 
 def _transform_ast(node):
+
+
+
     if isinstance(node, exp.Table) and (
         "INFORMATION_SCHEMA" in node.name.upper() or 
         (node.db and "INFORMATION_SCHEMA" in node.db.upper())

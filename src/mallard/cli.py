@@ -34,9 +34,9 @@ def fetch(
     """
     Pre-hydrate or update root BigQuery source partitions into local DuckDB.
     """
-    console.print("[bold blue]Compiling Dataform project...[/bold blue]")
-    compiled_graph = compile_dataform(vars=vars)
-    dag = build_dag(compiled_graph)
+    with console.status("[bold blue]Compiling Dataform project...[/bold blue]"):
+        compiled_graph = compile_dataform(vars=vars)
+        dag = build_dag(compiled_graph)
 
     console.print("[bold blue]Fetching all sources from BigQuery...[/bold blue]")
     # Fetch for all nodes
@@ -78,14 +78,12 @@ def run(
         console.print("[bold yellow]Refreshing sources...[/bold yellow]")
         clean_cache()
 
-    console.print("[bold blue]Compiling Dataform project...[/bold blue]")
-    compiled_graph = compile_dataform(vars=vars)
-
-    console.print("[bold blue]Building DAG...[/bold blue]")
-    dag = build_dag(compiled_graph)
-    selected_nodes = resolve_selection(
-        dag, select=select, tags=tags, upstream=upstream, downstream=downstream
-    )
+    with console.status("[bold blue]Compiling Dataform project and building DAG...[/bold blue]"):
+        compiled_graph = compile_dataform(vars=vars)
+        dag = build_dag(compiled_graph)
+        selected_nodes = resolve_selection(
+            dag, select=select, tags=tags, upstream=upstream, downstream=downstream
+        )
 
     if not selected_nodes:
         console.print("[bold red]No models selected to run.[/bold red]")
@@ -147,16 +145,12 @@ def iterate(
         )
         current_vars = f"{var}={val}"
 
-        console.print(
-            f"[bold blue]Compiling Dataform project for {var}={val}...[/bold blue]"
-        )
-        compiled_graph = compile_dataform(vars=current_vars)
-
-        console.print("[bold blue]Building DAG...[/bold blue]")
-        dag = build_dag(compiled_graph)
-        selected_nodes = resolve_selection(
-            dag, select=select, tags=tags, upstream=upstream, downstream=downstream
-        )
+        with console.status(f"[bold blue]Compiling Dataform project and building DAG for {var}={val}...[/bold blue]"):
+            compiled_graph = compile_dataform(vars=current_vars)
+            dag = build_dag(compiled_graph)
+            selected_nodes = resolve_selection(
+                dag, select=select, tags=tags, upstream=upstream, downstream=downstream
+            )
 
         if not selected_nodes:
             console.print(f"[bold red]No models selected to run for {val}.[/bold red]")

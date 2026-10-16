@@ -40,6 +40,7 @@ def build_dag(compiled_graph: dict) -> nx.DiGraph:
             # Add short name as an alias attribute for easier querying
             dag.nodes[node_id]["short_name"] = target.get("name")
 
+
     # Add edges based on dependencies
     for action in actions:
         target = action.get("target")
@@ -53,6 +54,17 @@ def build_dag(compiled_graph: dict) -> nx.DiGraph:
             dep_id = _target_to_id(dep)
             if dep_id in dag:
                 dag.add_edge(dep_id, node_id)
+                
+        # Fallback: check for hardcoded table references in the query
+        query = action.get("query", "")
+        if not query and action.get("type") == "incremental":
+            query = action.get("incrementalQuery", "")
+            
+        if query:
+            for potential_dep in dag.nodes():
+                if potential_dep != node_id and potential_dep in query:
+                    dag.add_edge(potential_dep, node_id)
+
 
     return dag
 
@@ -142,5 +154,22 @@ def resolve_selection(
         for match in list(initial_matches):
             selected_nodes.update(nx.descendants(dag, match))
 
+
     # Filter out declarations as they shouldn't be executed directly
-    return [n for n in selected_nodes if dag.nodes[n].get("type") != "declaration"]
+    final_selection = set()
+    for n in selected_nodes:
+        if dag.nodes[n].get("type") != "declaration":
+            final_selection.add(n)
+            
+    # Automatically include operations (like UDFs) that are ancestors of selected nodes
+    # so they are executed locally and their dependencies are hydrated properly.
+    operations_to_add = set()
+    for n in final_selection:
+        for anc in nx.ancestors(dag, n):
+            if dag.nodes[anc].get("type") == "operation":
+                operations_to_add.add(anc)
+                
+    final_selection.update(operations_to_add)
+    
+    return list(final_selection)
+

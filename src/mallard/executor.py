@@ -69,7 +69,19 @@ def execute_dag(dag: nx.DiGraph, selected_nodes: list[str], full_refresh: bool =
         )
         return
 
+
     con = duckdb.connect(db_path)
+    
+
+
+    # Optimize DuckDB for memory constrained workloads
+    con.execute("PRAGMA max_temp_directory_size='50GiB'")
+    con.execute("SET preserve_insertion_order=false")
+    con.execute("SET threads=1")
+    con.execute("PRAGMA memory_limit='12GB'")
+
+
+
 
     for node_id in ordered_nodes:
         node_data = dag.nodes[node_id]
@@ -129,7 +141,11 @@ def execute_dag(dag: nx.DiGraph, selected_nodes: list[str], full_refresh: bool =
 
                 if is_full_refresh:
                     # BEHAVIOR 1: Full rebuild
+
                     duckdb_sql = transpile_to_duckdb(query)
+                    with open(f".mallard/{table_name}.sql", "w") as f:
+                        f.write(duckdb_sql)
+
                     try:
                         con.execute(f"DROP VIEW IF EXISTS {table_name}")
                     except duckdb.CatalogException:
