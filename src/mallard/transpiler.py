@@ -37,33 +37,31 @@ def __log_debug(hypothesis_id, message, data):
 
 def _transform_ast(node):
 
-
-
     if isinstance(node, exp.Table) and (
-        "INFORMATION_SCHEMA" in node.name.upper() or 
-        (node.db and "INFORMATION_SCHEMA" in node.db.upper())
+        "INFORMATION_SCHEMA" in node.name.upper()
+        or (node.db and "INFORMATION_SCHEMA" in node.db.upper())
     ):
-            # When testing locally with DuckDB, replace any dynamic partition bound queries with a dummy date.
-            # E.g. date_id > (SELECT MIN(...) FROM INFORMATION_SCHEMA.PARTITIONS) becomes date_id > '1970-01-01'
-            curr = node
-            while curr:
-                if isinstance(curr, exp.Subquery):
-                    curr.replace(
-                        exp.Cast(
-                            this=exp.Literal.string("1970-01-01"),
-                            to=exp.DataType.build("DATE"),
-                        )
+        # When testing locally with DuckDB, replace any dynamic partition bound queries with a dummy date.
+        # E.g. date_id > (SELECT MIN(...) FROM INFORMATION_SCHEMA.PARTITIONS) becomes date_id > '1970-01-01'
+        curr = node
+        while curr:
+            if isinstance(curr, exp.Subquery):
+                curr.replace(
+                    exp.Cast(
+                        this=exp.Literal.string("1970-01-01"),
+                        to=exp.DataType.build("DATE"),
                     )
-                    break
-                curr = curr.parent
+                )
+                break
+            curr = curr.parent
 
     try:
         # Convert EXTRACT(DATE FROM x) to CAST(x AS DATE) since DuckDB doesn't support DATE as an extract specifier
         if isinstance(node, exp.Extract) and node.this.name.upper() == "DATE":
-                return exp.Cast(
-                    this=node.expression.transform(_transform_ast, copy=False),
-                    to=exp.DataType.build("DATE"),
-                )
+            return exp.Cast(
+                this=node.expression.transform(_transform_ast, copy=False),
+                to=exp.DataType.build("DATE"),
+            )
 
         # BigQuery FARM_FINGERPRINT -> DuckDB hash
         if isinstance(node, exp.FarmFingerprint):
@@ -88,16 +86,16 @@ def _transform_ast(node):
 
         # BigQuery SELECT AS STRUCT h.* -> DuckDB SELECT h
         if (
-            isinstance(node, exp.Select) 
-            and node.args.get("kind") == "STRUCT" 
-            and len(node.expressions) == 1 
-            and isinstance(node.expressions[0], exp.Column) 
+            isinstance(node, exp.Select)
+            and node.args.get("kind") == "STRUCT"
+            and len(node.expressions) == 1
+            and isinstance(node.expressions[0], exp.Column)
             and isinstance(node.expressions[0].this, exp.Star)
         ):
-                    table_name = node.expressions[0].args.get("table")
-                    if table_name:
-                        node.set("expressions", [exp.Column(this=table_name)])
-                        node.args["kind"] = None
+            table_name = node.expressions[0].args.get("table")
+            if table_name:
+                node.set("expressions", [exp.Column(this=table_name)])
+                node.args["kind"] = None
 
         if isinstance(node, exp.ArrayLast):
             return exp.Anonymous(
@@ -217,21 +215,21 @@ def _transform_ast(node):
                     )
 
                 if node.name.upper() == "DATE_DIFF" and len(node.expressions) == 3:
-                        date_part = node.expressions[0]
-                        if isinstance(date_part, exp.Literal):
-                            date_part_str = date_part.name.strip("'").strip('"')
-                            return exp.Anonymous(
-                                this="date_diff",
-                                expressions=[
-                                    exp.Identifier(this=date_part_str, quoted=False),
-                                    node.expressions[1].transform(
-                                        _transform_ast, copy=False
-                                    ),
-                                    node.expressions[2].transform(
-                                        _transform_ast, copy=False
-                                    ),
-                                ],
-                            )
+                    date_part = node.expressions[0]
+                    if isinstance(date_part, exp.Literal):
+                        date_part_str = date_part.name.strip("'").strip('"')
+                        return exp.Anonymous(
+                            this="date_diff",
+                            expressions=[
+                                exp.Identifier(this=date_part_str, quoted=False),
+                                node.expressions[1].transform(
+                                    _transform_ast, copy=False
+                                ),
+                                node.expressions[2].transform(
+                                    _transform_ast, copy=False
+                                ),
+                            ],
+                        )
 
             # Flatten fully qualified function calls to match our flattened table/macro names
             func_name = (
@@ -250,16 +248,16 @@ def _transform_ast(node):
                 )
 
         if isinstance(node, exp.In) and node.args.get("unnest"):
-                unnest_node = node.args["unnest"]
-                if isinstance(unnest_node, exp.Unnest):
-                    expr = (
-                        unnest_node.expressions[0]
-                        if unnest_node.expressions
-                        else exp.Null()
-                    )
-                    return exp.Anonymous(
-                        this="list_contains", expressions=[expr, node.this]
-                    )
+            unnest_node = node.args["unnest"]
+            if isinstance(unnest_node, exp.Unnest):
+                expr = (
+                    unnest_node.expressions[0]
+                    if unnest_node.expressions
+                    else exp.Null()
+                )
+                return exp.Anonymous(
+                    this="list_contains", expressions=[expr, node.this]
+                )
 
         if isinstance(node, exp.Unnest):
             offset = node.args.get("offset")

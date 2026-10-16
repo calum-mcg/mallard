@@ -5,7 +5,7 @@ from rich.panel import Panel
 from mallard.compiler import compile_dataform
 from mallard.executor import clean_cache, execute_dag
 from mallard.graph import build_dag, resolve_selection
-from mallard.hydrator import hydrate_sources
+from mallard.hydrator import get_config, hydrate_sources
 from mallard.init_wizard import run_init_wizard
 
 app = typer.Typer(
@@ -96,12 +96,23 @@ def run(
         f"[bold green]Selected {len(selected_nodes)} models to run.[/bold green]"
     )
 
+    required_sources = set()
+    for node in selected_nodes:
+        for anc in dag.predecessors(node):
+            if anc not in selected_nodes:
+                required_sources.add(anc)
+
     types = {}
     for node_id in selected_nodes:
         t = dag.nodes[node_id].get("type", "unknown")
         types[t] = types.get(t, 0) + 1
 
+    if required_sources:
+        types["declaration"] = len(required_sources)
+
     summary = []
+    if "declaration" in types:
+        summary.append(f"{types['declaration']} sources")
     if "table" in types:
         summary.append(f"{types['table']} tables")
     if "view" in types:
@@ -111,14 +122,18 @@ def run(
     if "assertion" in types:
         summary.append(f"{types['assertion']} assertions")
     if "operation" in types:
-        summary.append(f"{types['operation']} operations")
+        summary.append(f"{types['operation']} operations (UDFs)")
 
     summary_str = ", ".join(summary)
+
+    config = get_config()
+    row_limit = config.get("row_limit")
+    limit_str = f"{row_limit} rows" if row_limit else "None"
 
     console.print(
         Panel(
             f"[bold]Date:[/bold] {vars if vars else 'Not specified'}\n"
-            f"[bold]Limits:[/bold] {'None'}\n"  # We don't have limits info here easily, let's just say None for now or omit
+            f"[bold]Limits:[/bold] {limit_str}\n"
             f"[bold]Nodes:[/bold] {summary_str}",
             title="[bold blue]Executing DAG on DuckDB[/bold blue]",
             border_style="blue",
@@ -215,9 +230,15 @@ def iterate(
 
         summary_str = ", ".join(summary)
 
+        config = get_config()
+        row_limit = config.get("row_limit")
+        limit_str = f"{row_limit} rows" if row_limit else "None"
+
         console.print(
             Panel(
-                f"[bold]Date:[/bold] {current_vars}\n[bold]Nodes:[/bold] {summary_str}",
+                f"[bold]Date:[/bold] {current_vars}\n"
+                f"[bold]Limits:[/bold] {limit_str}\n"
+                f"[bold]Nodes:[/bold] {summary_str}",
                 title="[bold blue]Executing DAG on DuckDB[/bold blue]",
                 border_style="blue",
             )

@@ -52,7 +52,8 @@ def run_init_wizard():
         return
 
     row_limit = questionary.text(
-        "What is the default row limit for local execution? (e.g. 1000, use 0 for no limit)", default="1000"
+        "What is the default row limit for local execution? (e.g. 1000, use 0 for no limit)",
+        default="1000",
     ).ask()
     if row_limit is None:
         console.print("[bold red]Operation cancelled by user. Aborting.[/bold red]")
@@ -61,7 +62,9 @@ def run_init_wizard():
     try:
         row_limit = int(row_limit)
         if row_limit < 0:
-            console.print("[bold red]Row limit cannot be negative. Using 1000.[/bold red]")
+            console.print(
+                "[bold red]Row limit cannot be negative. Using 1000.[/bold red]"
+            )
             row_limit = 1000
     except ValueError:
         console.print("[bold red]Invalid row limit. Using 1000.[/bold red]")
