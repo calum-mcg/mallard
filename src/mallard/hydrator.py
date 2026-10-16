@@ -1,10 +1,10 @@
-import os
 import datetime
+import os
 from pathlib import Path
 
 import duckdb
-import yaml
 import sqlglot
+import yaml
 from google.cloud import bigquery
 from rich.console import Console
 from rich.prompt import Confirm
@@ -171,7 +171,7 @@ def hydrate_sources(dag, selected_nodes, compiled_graph=None):
         if cached_record:
             fetched_at = cached_record[0]
             # Simple human readable time difference
-            diff = datetime.datetime.now() - fetched_at
+            diff = datetime.datetime.now(datetime.UTC) - fetched_at
             hours, remainder = divmod(diff.total_seconds(), 3600)
             minutes, _ = divmod(remainder, 60)
             time_ago = f"{int(hours)}h {int(minutes)}m ago" if hours > 0 else f"{int(minutes)}m ago"

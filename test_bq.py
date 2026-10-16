@@ -1,5 +1,5 @@
-from google.cloud import bigquery
 import sqlglot
+from google.cloud import bigquery
 
 client = bigquery.Client()
 

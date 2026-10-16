@@ -1,5 +1,6 @@
 import typer
 from rich.console import Console
+from rich.panel import Panel
 
 from mallard.compiler import compile_dataform
 from mallard.executor import clean_cache, execute_dag
@@ -38,7 +39,7 @@ def fetch(
         compiled_graph = compile_dataform(vars=vars)
         dag = build_dag(compiled_graph)
 
-    console.print("[bold blue]Fetching all sources from BigQuery...[/bold blue]")
+    console.print("\n[bold blue]Hydrating sources...[/bold blue]")
     # Fetch for all nodes
     hydrate_sources(dag, list(dag.nodes()), compiled_graph=compiled_graph)
 
@@ -78,7 +79,9 @@ def run(
         console.print("[bold yellow]Refreshing sources...[/bold yellow]")
         clean_cache()
 
-    with console.status("[bold blue]Compiling Dataform project and building DAG...[/bold blue]"):
+    with console.status(
+        "[bold blue]Compiling Dataform project and building DAG...[/bold blue]"
+    ):
         compiled_graph = compile_dataform(vars=vars)
         dag = build_dag(compiled_graph)
         selected_nodes = resolve_selection(
@@ -93,8 +96,39 @@ def run(
         f"[bold green]Selected {len(selected_nodes)} models to run.[/bold green]"
     )
 
-    console.print("[bold blue]Executing DAG on DuckDB...[/bold blue]")
+    types = {}
+    for node_id in selected_nodes:
+        t = dag.nodes[node_id].get("type", "unknown")
+        types[t] = types.get(t, 0) + 1
+
+    summary = []
+    if "table" in types:
+        summary.append(f"{types['table']} tables")
+    if "view" in types:
+        summary.append(f"{types['view']} views")
+    if "incremental" in types:
+        summary.append(f"{types['incremental']} incremental models")
+    if "assertion" in types:
+        summary.append(f"{types['assertion']} assertions")
+    if "operation" in types:
+        summary.append(f"{types['operation']} operations")
+
+    summary_str = ", ".join(summary)
+
+    console.print(
+        Panel(
+            f"[bold]Date:[/bold] {vars if vars else 'Not specified'}\n"
+            f"[bold]Limits:[/bold] {'None'}\n"  # We don't have limits info here easily, let's just say None for now or omit
+            f"[bold]Nodes:[/bold] {summary_str}",
+            title="[bold blue]Executing DAG on DuckDB[/bold blue]",
+            border_style="blue",
+        )
+    )
+
+    console.print("\n[bold blue]Hydrating sources...[/bold blue]")
     hydrate_sources(dag, selected_nodes, compiled_graph=compiled_graph)
+
+    console.print("\n[bold blue]Processing models...[/bold blue]")
     execute_dag(dag, selected_nodes, full_refresh=full_refresh)
     console.print("[bold green]Execution completed successfully![/bold green]")
 
@@ -145,7 +179,9 @@ def iterate(
         )
         current_vars = f"{var}={val}"
 
-        with console.status(f"[bold blue]Compiling Dataform project and building DAG for {var}={val}...[/bold blue]"):
+        with console.status(
+            f"[bold blue]Compiling Dataform project and building DAG for {var}={val}...[/bold blue]"
+        ):
             compiled_graph = compile_dataform(vars=current_vars)
             dag = build_dag(compiled_graph)
             selected_nodes = resolve_selection(
@@ -160,8 +196,37 @@ def iterate(
             f"[bold green]Selected {len(selected_nodes)} models to run.[/bold green]"
         )
 
-        console.print("[bold blue]Executing DAG on DuckDB...[/bold blue]")
+        types = {}
+        for node_id in selected_nodes:
+            t = dag.nodes[node_id].get("type", "unknown")
+            types[t] = types.get(t, 0) + 1
+
+        summary = []
+        if "table" in types:
+            summary.append(f"{types['table']} tables")
+        if "view" in types:
+            summary.append(f"{types['view']} views")
+        if "incremental" in types:
+            summary.append(f"{types['incremental']} incremental models")
+        if "assertion" in types:
+            summary.append(f"{types['assertion']} assertions")
+        if "operation" in types:
+            summary.append(f"{types['operation']} operations")
+
+        summary_str = ", ".join(summary)
+
+        console.print(
+            Panel(
+                f"[bold]Date:[/bold] {current_vars}\n[bold]Nodes:[/bold] {summary_str}",
+                title="[bold blue]Executing DAG on DuckDB[/bold blue]",
+                border_style="blue",
+            )
+        )
+
+        console.print("\n[bold blue]Hydrating sources...[/bold blue]")
         hydrate_sources(dag, selected_nodes, compiled_graph=compiled_graph)
+
+        console.print("\n[bold blue]Processing models...[/bold blue]")
         execute_dag(dag, selected_nodes, full_refresh=full_refresh)
 
     console.print("\n[bold green]All iterations completed successfully![/bold green]")
