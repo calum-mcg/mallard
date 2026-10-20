@@ -24,6 +24,7 @@ def test_cli_run_full_refresh(mocker):
     mocker.patch("mallard.cli.build_dag")
     mocker.patch("mallard.cli.resolve_selection", return_value=["node1"])
     mocker.patch("mallard.cli.hydrate_sources")
+    mocker.patch("mallard.cli.get_config", return_value={"row_limit": 1000})
     mock_execute = mocker.patch("mallard.cli.execute_dag")
 
     result = runner.invoke(app, ["run", "--full-refresh"])

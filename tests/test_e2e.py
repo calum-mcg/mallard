@@ -40,9 +40,35 @@ def mock_bq_client(mocker):
     mock_client = mocker.MagicMock()
     mock_query_job = mocker.MagicMock()
     mock_query_job.to_arrow.return_value = mock_arrow_table
+    mock_query_job.total_bytes_processed = 1048576
     mock_client.query.return_value = mock_query_job
+    mock_client.project = "test-project"
 
     mocker.patch("mallard.hydrator.bigquery.Client", return_value=mock_client)
+
+    import duckdb
+    original_connect = duckdb.connect
+
+    class DuckDBConnectionProxy:
+        def __init__(self, con):
+            self._con = con
+            
+        def execute(self, query, *args, **kwargs):
+            if isinstance(query, str) and "bigquery_query" in query:
+                import re
+                query = re.sub(r"bigquery_query\([^)]+\)", "mock_arrow_table", query)
+                self._con.register("mock_arrow_table", mock_arrow_table)
+            return self._con.execute(query, *args, **kwargs)
+            
+        def __getattr__(self, name):
+            return getattr(self._con, name)
+
+    def mock_connect(*args, **kwargs):
+        con = original_connect(*args, **kwargs)
+        return DuckDBConnectionProxy(con)
+
+    mocker.patch("mallard.hydrator.duckdb.connect", side_effect=mock_connect)
+    mocker.patch("mallard.executor.duckdb.connect", side_effect=mock_connect)
 
     return mock_client
 
@@ -93,11 +119,12 @@ def mock_compile_dataform(mocker):
     return _mock_compile
 
 
-def test_e2e_duckdb_output(dummy_project, mock_bq_client, mock_compile_dataform):
+def test_e2e_duckdb_output(dummy_project, mock_bq_client, mock_compile_dataform, mocker):
     """
     Test compilation, transpilation, DuckDB execution and that output table contains expected filtered data.
     """
     import duckdb
+    mocker.patch("mallard.hydrator.Confirm.ask", return_value=True)
 
     # Setup minimal config needed for execution
     config = {
@@ -141,7 +168,7 @@ def test_e2e_assertion_pass(dummy_project, mock_bq_client, mock_compile_dataform
     result = runner.invoke(app, ["run", "--select", "+assert_pass"])
 
     assert result.exit_code == 0
-    assert "✅ test-project.test_dataset_assertions.assert_pass" in result.stdout
+    assert "1/1 assertions passed" in result.stdout
 
 
 def test_e2e_assertion_fail(dummy_project, mock_bq_client, mock_compile_dataform):
