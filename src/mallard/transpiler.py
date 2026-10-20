@@ -13,23 +13,16 @@ import sqlglot.expressions as exp
 def __log_debug(hypothesis_id, message, data):
     # #region agent log
     try:
-        with open(
-            "/Users/calummcguicken/Documents/github/mallard/.cursor/debug-4f7a57.log",
-            "a",
-        ) as f:
-            f.write(
-                json.dumps(
-                    {
-                        "sessionId": "4f7a57",
-                        "hypothesisId": hypothesis_id,
-                        "location": "transpiler.py",
-                        "message": message,
-                        "data": data,
-                        "timestamp": int(time.time() * 1000),
-                    }
-                )
-                + "\n"
+        logging.debug(
+            json.dumps(
+                {
+                    "hypothesisId": hypothesis_id,
+                    "location": "transpiler.py",
+                    "message": message,
+                    "data": data,
+                }
             )
+        )
     except Exception:
         pass
     # #endregion
