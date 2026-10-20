@@ -2,9 +2,9 @@ import logging
 
 import sqlglot
 
+logger = logging.getLogger(__name__)
 logging.getLogger("sqlglot").setLevel(logging.ERROR)
 import json
-import time
 import traceback
 
 import sqlglot.expressions as exp
@@ -13,7 +13,7 @@ import sqlglot.expressions as exp
 def __log_debug(hypothesis_id, message, data):
     # #region agent log
     try:
-        logging.debug(
+        logger.debug(
             json.dumps(
                 {
                     "hypothesisId": hypothesis_id,
